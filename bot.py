@@ -55,12 +55,17 @@ class ModelParams:
         "vid_stride": 10
     }
 
+    custom_trained = {
+        "model_name": "v8s_14lcs_22ep.pt",
+        "imgsz": 32 * 10,
+        "vid_stride": 10
+    }
+
 
 
 def init_model(update: Update, context: CallbackContext):
     msg = update.message.reply_text(f'model_params: \n{context.user_data["local_model_params"]}')
     # msg.message_id
-
     context.user_data["detect"] = Detection(model_name=context.user_data["local_model_params"]["model_name"])
     update.message.reply_text(f'Upload your video', reply_markup=keyboard_start())
     context.user_data["menu"] = "init_model"
@@ -72,13 +77,7 @@ def keyboard_start():
     return reply_markup
 
 
-
-
 def start(update: Update, context: CallbackContext):
-    # update.message.reply_text('Choose an option:', reply_markup=reply_markup)
-    # update.message.reply_text('Send me a video', reply_markup=reply_markup)
-
-
     update.message.reply_text('I can detect objects\nFrom COCO dataset (80 classes) using YOLOv8',
                               reply_markup=keyboard_start())
     context.user_data["menu"] = "start"
@@ -86,9 +85,6 @@ def start(update: Update, context: CallbackContext):
     if check_gpu():
         context.user_data["local_model_params"] = ModelParams.best_but_slow_params
     init_model(update, context)
-    # update.message.reply_text(f'model_params: \n{context.user_data["local_model_params"]}')
-    # context.user_data["detect"] = Detection(model_name=context.user_data["local_model_params"]["model_name"])
-
     return
 
 
@@ -103,19 +99,13 @@ def sent_to_sleep(update: Update, context: CallbackContext):
 def handle_change_params(update: Update, context: CallbackContext):
     update.message.reply_text('Choose one of presets: ')
 
-    local_params = {
-        "model_name": "yolov8s.pt",
-        "imgsize": 32 * 8,
-        "vid_stride": 10
-    }
-
-    presets_str = "\n```\n1. fastest: model = yolov8n, imgsize = 32*8, vid_stride = 15\n" + \
-                  "\n2. default_test: model = yolov8s, imgsize = 32*8, vid_stride = 10\n" + \
-                  "\n3. normal_working: model = yolov8s, imgsize = 32*10, vid_stride = 1\n" + \
-                  "\n4. best_but_slow: model = yolov8m, imgsize = 32*10, vid_stride = 1\n```"
+    presets_str = f"\n```\n1. default_test_params{ModelParams.default_test_params}\n\n2. custom_trained{ModelParams.custom_trained}\n" \
+                  f"\n3. fastest_params{ModelParams.fastest_params}\n\n4. normal_working_params{ModelParams.normal_working_params}\n" \
+                  f"\n5. best_but_slow_params{ModelParams.best_but_slow_params}\n\n6. slow_test_params{ModelParams.slow_test_params}\n" \
+                  f"```"
 
     kb = [[KeyboardButton('fastest')], [KeyboardButton('default_test')], [KeyboardButton('normal_working')],
-          [KeyboardButton('best_but_slow')], [KeyboardButton('slow_test')], [KeyboardButton('cancel')]]
+          [KeyboardButton('best_but_slow')], [KeyboardButton('slow_test')], [KeyboardButton('custom_trained')], [KeyboardButton('cancel')]]
 
     reply_markup = ReplyKeyboardMarkup(kb, resize_keyboard=True, one_time_keyboard=True)
 
@@ -140,8 +130,9 @@ def preset_change(update: Update, context: CallbackContext):
         context.user_data["local_model_params"] = ModelParams.best_but_slow_params
     if update.message.text == "slow_test":
         context.user_data["local_model_params"] = ModelParams.slow_test_params
+    if update.message.text == "custom_trained":
+        context.user_data["local_model_params"] = ModelParams.custom_trained
 
-    # update.message.reply_text(f'Model changed\nModel params: \n{context.user_data["local_model_params"]}')
     update.message.reply_text(f'Model changed')
 
     init_model(update, context)
@@ -177,11 +168,16 @@ def calculate_processing_time(update: Update, context: CallbackContext):
         32 * 8: 30
     }
 
-    speed_ms = imgsz_speed_ms[context.user_data["detect"].imgsz] * model_coef[context.user_data["detect"].model_name]
-    print(f"each frame ~speed_ms = {speed_ms}")
+    if context.user_data["detect"].model_name in model_coef.keys():
+        speed_ms = imgsz_speed_ms[context.user_data["detect"].imgsz] * model_coef[
+            context.user_data["detect"].model_name]
+    else:
+        speed_ms = imgsz_speed_ms[context.user_data["detect"].imgsz] * model_coef["yolov8s.pt"]
+        print(f"each frame ~speed_ms = {speed_ms}")
 
     time_to_process_seconds = context.user_data["detect"].metadata.frames * speed_ms / 1000 / context.user_data[
         "detect"].vid_stride
+
     if context.user_data["detect"].gpu_available:
         time_to_process_seconds /= 10
     print(f"time_to_process_seconds = {time_to_process_seconds}")
@@ -195,17 +191,19 @@ def show_available_classes_names(update: Update, context: CallbackContext):
                               parse_mode="Markdown")
     return
 
-# def keyboard_select_class():
-#     kb = [[KeyboardButton('change_params')], [KeyboardButton('cancel')], [KeyboardButton('available_classes')]]
-#     reply_markup = ReplyKeyboardMarkup(kb, one_time_keyboard=True, resize_keyboard=True)
-#     return reply_markup
 
 def keyboard_select_class(update: Update, context: CallbackContext):
-    #kb = [[KeyboardButton('select_class')], [KeyboardButton('upload_next')]]
     kb = [[KeyboardButton('select_class')]]
     reply_markup = ReplyKeyboardMarkup(kb, resize_keyboard=True, one_time_keyboard=True)
     update.message.reply_text(f"Select certain class / Upload next video", reply_markup=reply_markup)
     context.user_data["menu"] = "select_class"
+    return reply_markup
+
+
+def keyboard_show_frame(update: Update, context: CallbackContext):
+    kb = [[KeyboardButton('select_class')], [KeyboardButton('show_frame')], [KeyboardButton('cancel')]]
+    reply_markup = ReplyKeyboardMarkup(kb, resize_keyboard=True, one_time_keyboard=True)
+    update.message.reply_text(f"Show certain frame / Select certain class / Upload next video", reply_markup=reply_markup)
     return reply_markup
 
 
@@ -216,6 +214,12 @@ def handle_select_class(update: Update, context: CallbackContext):
     return
 
 
+def handle_show_frame(update: Update, context: CallbackContext):
+    update.message.reply_text("Write frame index from intervals above:")
+    context.user_data["menu"] = "show_frame"
+    return
+
+
 def handle_text_input(update: Update, context: CallbackContext):
     if context.user_data["menu"] == "input_class_name":
         text = update.message.text
@@ -223,14 +227,37 @@ def handle_text_input(update: Update, context: CallbackContext):
             update.message.reply_text(f"Wrong class name")
             return
         indexes = context.user_data["detect"].extract_class_frames_indexes_list(class_name=str(text))
-        folder_path, found_frames_idx = context.user_data["detect"].extract_class_frames_to_folder(indexes, class_name=str(text))
+        folder_path_no_boxes, _ = context.user_data["detect"].extract_class_frames_to_folder(indexes,
+                                                                                          class_name=str(text),
+                                                                                          without_det_boxes=True)
+        zip_path_no_boxes = context.user_data["detect"].zip_folder(folder_path_no_boxes)
+
+        folder_path, found_frames_idx = context.user_data["detect"].extract_class_frames_to_folder(indexes,
+                                                                                                   class_name=str(text),
+                                                                                                   without_det_boxes=False)
         zip_path = context.user_data["detect"].zip_folder(folder_path)
 
+        context.user_data["found_frames_idx"] = found_frames_idx
+        context.user_data["last_folder_path"] = folder_path
+
+        with open(zip_path_no_boxes, 'rb') as file:
+            context.bot.send_document(chat_id=update.message.chat_id, document=file)
         with open(zip_path, 'rb') as file:
             context.bot.send_document(chat_id=update.message.chat_id, document=file)
         update.message.reply_text(f"Found [{len(found_frames_idx)}] frames with object:" +
-                                  f"\n```\n{context.user_data['detect'].get_frames_intervals(found_frames_idx)}```",parse_mode="Markdown")
-        keyboard_select_class(update, context)
+                                  f"\n```\n{context.user_data['detect'].get_frames_intervals(found_frames_idx)}```",
+                                  parse_mode="Markdown")
+        keyboard_show_frame(update, context)
+
+    if context.user_data["menu"] == "show_frame":
+        text = int(update.message.text)
+        if text not in context.user_data["found_frames_idx"]:
+            update.message.reply_text(f"Wrong frame index")
+            return
+        frame_path = context.user_data["last_folder_path"] + "/" + str(text) + ".jpg"
+        with open(frame_path, 'rb') as file:
+            context.bot.send_photo(chat_id=update.message.chat_id, photo=file)
+
     return
 
 
@@ -239,8 +266,6 @@ def preprocess_video_and_upload(update: Update, context: CallbackContext):
     print(f"first_time={first_time}")
 
     context.user_data["detect"].preprocess_video(compress_video=True)
-
-    # pps_video_filepath = preprocess_video_and_upload(context.user_data["local_file_path"], update, context)
 
     pps_video_filepath = context.user_data["detect"].result_filepath
 
@@ -253,16 +278,13 @@ def preprocess_video_and_upload(update: Update, context: CallbackContext):
 
     # local_file_path = f'./{video.file_id}_preprocessed.mp4'
     # local_file_path = 'Tonylife2_preprocessed.mp4'
-    # pps_video_filepath = #preprocessed
 
     with open(pps_video_filepath, 'rb') as file:
         context.bot.send_video(chat_id=update.message.chat_id, video=file)
 
-    # update.message.reply_text("'person': 414,\n 'car': 122,\n 'potted plant': 10,\n 'umbrella': 18,\n 'bicycle': 20,\n 'toothbrush': 11,\n 'bus': 2,\n 'traffic light': 2, \n 'handbag': 1, \n 'bottle': 11, \n 'tie': 2, \n 'wine glass: 1")
+
     local_unique_classes = context.user_data['detect'].unique_classes[1]
     update.message.reply_text(f"Unique classes times found:\n```\n{local_unique_classes}```", parse_mode="Markdown")
-
-    #update.message.reply_text(f"Select certain class / Upload next video", reply_markup=keyboard_select_class(update, context))
 
     keyboard_select_class(update, context)
     # play_video(context.user_data["detect"].result_filepath)
@@ -284,7 +306,6 @@ def handle_video(update: Update, context: CallbackContext):
 
     local_file_path = create_userid_folder(update, context) + "/"
 
-    # local_file_path = f'{video.file_id}.mp4'
     local_file_path += f'{video.file_unique_id}.mp4'
     context.user_data["local_file_path"] = local_file_path
     video_file.download(context.user_data["local_file_path"])
@@ -308,17 +329,12 @@ def handle_video(update: Update, context: CallbackContext):
     return
 
 
-def button2(update: Update, context: CallbackContext):
-    print("Returned to start")
-    return start(update, context)
-
-
-# def first_menu(update, context):
-#     query = update.callback_query
-#     query.answer()
-#     query.edit_message_text(
-#         text=first_menu_message(),
-#         reply_markup=first_menu_keyboard())
+def handle_cancel(update: Update, context: CallbackContext):
+    update.message.reply_text('Returned to start menu', reply_markup=keyboard_start())
+    print("Returned start menu\nUpload your video")
+    context.user_data["menu"] = "cancel"
+    return
+    #return start(update, context)
 
 
 def detect_menu_keyboard(update: Update, context: CallbackContext):
@@ -341,15 +357,19 @@ def main():
     dp.add_handler(MessageHandler(Filters.regex('^normal_working'), preset_change))
     dp.add_handler(MessageHandler(Filters.regex('^best_but_slow'), preset_change))
     dp.add_handler(MessageHandler(Filters.regex('^slow_test'), preset_change))
+    dp.add_handler(MessageHandler(Filters.regex('^custom_trained'), preset_change))
+
     dp.add_handler(MessageHandler(Filters.regex('^detect'), preprocess_video_and_upload))
+    #dp.add_handler(MessageHandler(Filters.regex('^detect_obj365'), preprocess_video_and_upload))
     dp.add_handler(MessageHandler(Filters.regex('^select_class'), handle_select_class))
-    #dp.add_handler(MessageHandler(Filters.regex('^upload_next'), preprocess_video_and_upload))
+    dp.add_handler(MessageHandler(Filters.regex('^show_frame'), handle_show_frame))
+    # dp.add_handler(MessageHandler(Filters.regex('^upload_next'), preprocess_video_and_upload))
 
     dp.add_handler(MessageHandler(Filters.regex('^available_classes'), show_available_classes_names))
     dp.add_handler(MessageHandler(Filters.video, handle_video))
     dp.add_handler(MessageHandler(Filters.document, handle_video))
     dp.add_handler(MessageHandler(Filters.animation, handle_video))
-    dp.add_handler(MessageHandler(Filters.regex('^cancel$'), button2))
+    dp.add_handler(MessageHandler(Filters.regex('^cancel$'), handle_cancel))
     dp.add_handler(MessageHandler(Filters.text, handle_text_input))
     updater.start_polling()
     updater.idle()
