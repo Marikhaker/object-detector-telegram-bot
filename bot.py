@@ -10,10 +10,6 @@ from dataclasses import dataclass
 from object_detection import Detection, play_video, Metadata, check_gpu
 
 
-class LocalUser:
-    pass
-
-
 # Replace TOKEN with your own Telegram bot token
 TOKEN = ''
 
