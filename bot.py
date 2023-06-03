@@ -53,8 +53,8 @@ class ModelParams:
 
     custom_trained = {
         "model_name": "v8s_14lcs_22ep.pt",
-        "imgsz": 32 * 10,
-        "vid_stride": 10
+        "imgsz": 32 * 20,
+        "vid_stride": 1
     }
 
 
