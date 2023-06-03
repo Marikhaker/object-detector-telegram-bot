@@ -9,7 +9,6 @@ from dataclasses import dataclass
 # https://docs.python-telegram-bot.org/en/v13.7/index.html
 from object_detection import Detection, play_video, Metadata, check_gpu
 
-
 # Replace TOKEN with your own Telegram bot token
 TOKEN = ''
 
@@ -237,9 +236,9 @@ def handle_text_input(update: Update, context: CallbackContext):
         context.user_data["last_folder_path"] = folder_path
 
         with open(zip_path_no_boxes, 'rb') as file:
-            context.bot.send_document(chat_id=update.message.chat_id, document=file)
+            context.bot.send_document(chat_id=update.message.chat_id, document=file, caption="No_detection_boxes_zip")
         with open(zip_path, 'rb') as file:
-            context.bot.send_document(chat_id=update.message.chat_id, document=file)
+            context.bot.send_document(chat_id=update.message.chat_id, document=file, caption="Zip_with_detection_boxes")
         update.message.reply_text(f"Found [{len(found_frames_idx)}] frames with object:" +
                                   f"\n```\n{context.user_data['detect'].get_frames_intervals(found_frames_idx)}```",
                                   parse_mode="Markdown")
@@ -326,7 +325,7 @@ def handle_video(update: Update, context: CallbackContext):
 
 
 def handle_cancel(update: Update, context: CallbackContext):
-    update.message.reply_text('Returned to start menu', reply_markup=keyboard_start())
+    update.message.reply_text('Returned start menu\nUpload your video', reply_markup=keyboard_start())
     print("Returned start menu\nUpload your video")
     context.user_data["menu"] = "cancel"
     return
