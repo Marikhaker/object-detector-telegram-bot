@@ -3,6 +3,7 @@
 import numpy as np
 import ultralytics
 from ultralytics import YOLO
+import torch
 import os
 import shutil
 import subprocess
@@ -37,6 +38,7 @@ def play_video(filepath):
     # Closes all the frames
     cv2.destroyAllWindows()
 
+
 def check_gpu():
     if torch.cuda.is_available():
         print("GPU is available")
@@ -52,7 +54,7 @@ class Metadata:
         import re
         self.filepath = filepath
         self.metadata = self.extract_metadata(filepath)
-        #print(self.metadata)
+        # print(self.metadata)
         i = 0
         while self.metadata['streams'][i]['codec_type'] == "audio":
             i += 1
@@ -61,8 +63,8 @@ class Metadata:
         self.frames = int(self.metadata['streams'][i]['nb_frames'])
         self.width = self.metadata['streams'][i]['width']
         self.height = self.metadata['streams'][i]['height']
-        #self.frame_rate = int(re.search(r'\d+', self.metadata['streams'][0]['avg_frame_rate']).group())
-        self.frame_rate = float("{:.3f}".format(self.frames/self.duration))
+        # self.frame_rate = int(re.search(r'\d+', self.metadata['streams'][0]['avg_frame_rate']).group())
+        self.frame_rate = float("{:.3f}".format(self.frames / self.duration))
 
     def get_metadata_str(self) -> str:
         buffer = StringIO()
@@ -105,6 +107,8 @@ class Detection:
         # model = YOLO('yolov8n.pt')  # load a pretrained YOLOv8n detection model
         # n - smallest, s - balance, m - good
 
+        self.obj365_model = None
+
     def get_dir_filename_ext(self, filepath):
         directory, file_name = os.path.split(self.filepath)
         file_name, extension = os.path.splitext(file_name)
@@ -146,7 +150,7 @@ class Detection:
         if directory != "":
             output_path = directory + "/" + file_name + "_comp" + extension
         else:
-            output_path = file_name + "_comp" + extension #added to stop saving to absolute path when no dir name
+            output_path = file_name + "_comp" + extension  # added to stop saving to absolute path when no dir name
         subprocess.run(
             [
                 "ffmpeg",
@@ -166,7 +170,7 @@ class Detection:
         )
         return output_path
 
-    def set_ppc_params(self, filepath="tonylife2.mp4", vid_stride=5, imgsz=32 * 8, conf=0.25, iou=0.7, half=False):
+    def set_ppc_params(self, filepath="tonylife2.mp4", vid_stride=5, imgsz=32 * 8, conf=0.2, iou=0.5, half=False):
         self.filepath = filepath
         self.imgsz = imgsz
         self.vid_stride = vid_stride
@@ -179,7 +183,6 @@ class Detection:
 
         import os
         if os.path.exists(self.filepath):
-
             self.results = self.model.predict(source=self.filepath,
                                               save=True,
                                               vid_stride=self.vid_stride,
@@ -187,7 +190,7 @@ class Detection:
                                               imgsz=self.imgsz,
                                               conf=self.conf,
                                               iou=self.iou,
-                                              half = self.half,
+                                              half=self.half,
                                               # save_txt=True,
                                               save_txt=False,
                                               save_conf=True,
@@ -199,8 +202,8 @@ class Detection:
 
         self.get_classes_names()
         classes: Dict[int, str] = self.available_classes_names
-        #classes: Dict[int, str] = self.results[0].names
-        #self.available_classes_names = classes
+        # classes: Dict[int, str] = self.results[0].names
+        # self.available_classes_names = classes
 
         classes_names_list = [[classes[cls] for cls in result.boxes.cls.cpu().numpy()] for result in self.results]
         classes_idx_list = [result.boxes.cls.cpu().numpy() for result in self.results]
@@ -239,10 +242,10 @@ class Detection:
 
         buffer = StringIO()
         sys.stdout = buffer
-        #for item, count in unique_items.items():
+        # for item, count in unique_items.items():
         #    print(f"{str(self.available_classes_names_rev[item]) + '.':<4}{item:<18} {count}")
         for item in sorted_items:
-            print(f"{str(self.available_classes_names_rev[item[0]])+'.':<4}{item[0]:<18} {item[1]}")
+            print(f"{str(self.available_classes_names_rev[item[0]]) + '.':<4}{item[0]:<18} {item[1]}")
         print_output = buffer.getvalue()
         sys.stdout = sys.__stdout__
 
@@ -270,22 +273,23 @@ class Detection:
             indexes.append([idx for idx, value in enumerate(frame[0]) if value == class_name])
         return indexes
 
-    def extract_class_frames_to_folder(self, indexes: List, class_name: str, without_det_boxes = False) -> (str, List):
+    def extract_class_frames_to_folder(self, indexes: List, class_name: str, without_det_boxes=False) -> (str, List):
         """Returns filepath to zip with images where this class is shown"""
 
         directory, file_name = os.path.split(self.filepath)
         file_name, extension = os.path.splitext(file_name)
 
-        folder_path = os.path.join(directory, file_name + "_" + class_name)
+        folder_path = os.path.join(directory, file_name + "_" + class_name + "_" + self.model_name)
+
         if without_det_boxes:
-            folder_path = folder_path + "_" + "no_det_boxes"
+            folder_path = folder_path + "_" + "no_boxes"
 
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
         frames_indexes = []
 
         for i, frame in enumerate(zip(self.results, indexes)):
-            #cv2_imshow(frame[idx].plot(probs=True, boxes=True))
+            # cv2_imshow(frame[idx].plot(probs=True, boxes=True))
             frame_idx_list = frame[1]
             if len(frame_idx_list):
                 frame_name = os.path.join(folder_path, f"{i}.jpg")
@@ -331,15 +335,11 @@ class Detection:
 
     def zip_folder(self, folder_path):
         # Compress the folder to a zip file
-        #zip_path = folder_path + ".zip"
+        # zip_path = folder_path + ".zip"
         zip_path = folder_path
         shutil.make_archive(zip_path, 'zip', folder_path)
 
         return zip_path + ".zip"
-
-    def get_class_timecodes(self, class_name: str) -> str:
-
-        pass
 
     def get_frames_intervals(self, frames) -> str:
         intervals = []
@@ -357,61 +357,82 @@ class Detection:
                 intervals.append(str(start) + '-' + str(end))
         return f"[{', '.join(intervals)}]"
 
+    def classify_img(self, filepath, save_folder_path):
+        if self.obj365_model is None:
+            self.obj365_model = torch.hub.load('ultralytics/yolov5', 'custom', path='yolov5m_Objects365.pt')
+        result = self.obj365_model(filepath,
+                        #save=True,
+                        #vid_stride=self.vid_stride,
+                        # imgsz= max(width, height),
+                        # imgsz=640,
+                        # # save_txt=True,
+                        # save_txt=False,
+                        # save_conf=True,
+                        )
+        directory, file_name = os.path.split(filepath)
+        file_name, extension = os.path.splitext(file_name)
+        result_filepath = os.path.join(save_folder_path, file_name + extension)
 
-    def make_video_with_ceratin_class(self):
-        pass
-        # Load the YOLOv8 model
-        # model = YOLO('yolov8n.pt')
+        # id_cls_conf =
         #
-        # # Open the video file
-        # video_path = "path/to/your/video/file.mp4"
-        # cap = cv2.VideoCapture(video_path)
+        # classes_names_list = [[classes[cls] for cls in result.boxes.cls.cpu().numpy()] for result in self.results]
+        # classes_idx_list = [result.boxes.cls.cpu().numpy() for result in self.results]
+        # conf_list = [result.boxes.conf.cpu().numpy() for result in self.results]
+        #
+        # self.box_coords_list = [result.boxes.xyxy.cpu().numpy() for result in self.results]
+        #
+        # self.cls_and_conf_each_frame = list(zip(classes_names_list, conf_list, classes_idx_list))
+        # print(self.cls_and_conf_each_frame)
+        # self.unique_classes = self.get_unique_classes()
+        # print(self.unique_classes)
+        #
+        # directory, file_name = os.path.split(self.filepath)
+        # self.extract_result_file(directory)
+        result.print()
+        result.save()
+        #result.show()
+        # cv2.imshow('', result.ims[0][:, :, [2, 1, 0]])
+        # cv2.waitKey(0)
+        cv2.imwrite(result_filepath, result.ims[0][:, :, [2, 1, 0]])
 
-        #img_array =
+    def classify_folder(self, folder_path):
 
-        # # Loop through the video frames
-        # while cap.isOpened():
-        #     # Read a frame from the video
-        #     success, frame = cap.read()
-        #
-        #     if success:
-        #         # Run YOLOv8 inference on the frame
-        #         results = model(frame)
-        #
-        #         # Visualize the results on the frame
-        #         annotated_frame = results[0].plot()
-        #
-        #         # Display the annotated frame
-        #         cv2.imshow("YOLOv8 Inference", annotated_frame)
-        #
-        #         # Break the loop if 'q' is pressed
-        #         if cv2.waitKey(1) & 0xFF == ord("q"):
-        #             break
-        #     else:
-        #         # Break the loop if the end of the video is reached
-        #         break
-        #
-        # # Release the video capture object and close the display window
-        # cap.release()
-        # cv2.destroyAllWindows()
+        files_list = os.listdir(folder_path)
+        files_list = [f"{folder_path}/{file}" for file in files_list]
+        result_folder_path = folder_path + "_obj365"
+
+        if not os.path.exists(result_folder_path):
+            os.makedirs(result_folder_path)
+
+        for file in files_list:
+            self.classify_img(file, result_folder_path)
+
+        return result_folder_path
 
 
 if __name__ == "__main__":
-    detect = Detection(model_name='yolov8s.pt')
-    detect.set_ppc_params(filepath="tonylife2.mp4", vid_stride=15, imgsz=32*10)
+    #detect = Detection(model_name='yolov8s.pt')
+    detect = Detection(model_name='v8s_14cls.pt')
+    # detect = Detection(model_name='yolov5m_Objects365.pt')
+    detect.set_ppc_params(filepath="tonylife2.mp4", vid_stride=15, imgsz=32 * 10)
+    #
+    # time1 = datetime.datetime.now()
+    # detect.preprocess_video(compress_video=True)
+    # time2 = datetime.datetime.now()
+    # elapsedTime = time2 - time1
+    #
+    # print(f"Time taken: [{divmod(elapsedTime.total_seconds(), 60)}] min, sec")
 
-    time1 = datetime.datetime.now()
-    detect.preprocess_video(compress_video=True)
-    time2 = datetime.datetime.now()
-    elapsedTime = time2 - time1
+    # detect.classify_img("tonylife2_person_no_det_boxes/0.jpg")
 
-    print(f"Time taken: [{divmod(elapsedTime.total_seconds(), 60)}] min, sec")
+    detect.classify_folder("tonylife2_person_no_det_boxes")
 
     # #play_video(detect.result_filepath)
     # cls_name = "person"
     # indexes = detect.extract_class_frames_indexes_list(class_name=cls_name)
     # folder_path, found_frames_idx = detect.extract_class_frames_to_folder(indexes, class_name=cls_name,
     #                                                                       without_det_boxes = False)
+
     # detect.crop_class_img_by_coords_and_save_to_folder("tonylife2_person/0.jpg", detect.box_coords_list[0])
 
     # classification_model = YOLO('yolov8l-cls.pt')
@@ -427,7 +448,6 @@ if __name__ == "__main__":
     # cls_list.sort(key=lambda x: x[0], reverse=True)
     #
     # print("here")
-
 
 # buffer = StringIO()
 # sys.stdout = buffer
