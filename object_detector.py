@@ -417,7 +417,7 @@ if __name__ == "__main__":
     detect.set_ppc_params(filepath="tonylife2.mp4", vid_stride=15, imgsz=32 * 10)
     #
     # time1 = datetime.datetime.now()
-    # detect.preprocess_video(compress_video=True)
+    detect.preprocess_video(compress_video=True)
     # time2 = datetime.datetime.now()
     # elapsedTime = time2 - time1
     #
