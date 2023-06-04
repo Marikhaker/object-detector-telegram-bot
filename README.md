@@ -1,4 +1,4 @@
-# Video object detection system using Ultralytics YOLOv8 and Telegram-bot
+# Video object detection using Ultralytics YOLOv8 and Telegram-bot
 Run by starting bot.py. 
 
 ## Demo
