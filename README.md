@@ -4,6 +4,13 @@ Run by starting bot.py.
 ## Demo
 https://github.com/Marikhaker/object-detector-telegram-bot/assets/55658081/a4ebcd25-5d04-46d5-b17e-c019e8bb791a
 
+## Acrhitecture
+<div align="center">
+  <p>
+     <img width="40%" src="https://github.com/Marikhaker/object-detector-telegram-bot/blob/main/training_summary/system%20architecture.jpg?raw=true">
+  </p>
+</div>
+
 ## Training results
 Trained YOLOv8s for 22 epoches for 14 classes. Trained on part of Open-Images-v7 dataset: 15k for train, 1k for validate. Dataset downloaded with FiftyOne.
 ```
